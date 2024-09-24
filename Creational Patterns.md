@@ -9,8 +9,6 @@
 ### 1. 컴퓨터 클래스 (복잡한 객체)
 
 ```python
-python
-코드 복사
 class Computer:
     def __init__(self):
         self.cpu = None
@@ -32,8 +30,6 @@ class Computer:
 빌더 클래스는 컴퓨터 객체를 생성하는 과정의 각 단계를 제공합니다.
 
 ```python
-python
-코드 복사
 class ComputerBuilder:
     def __init__(self):
         self.computer = Computer()
@@ -64,8 +60,6 @@ class ComputerBuilder:
 디렉터 클래스는 객체 생성의 단계들을 지정된 순서에 따라 호출함으로써 빌더 패턴을 관리하는 역할을 합니다. 이는 빌더 패턴의 필수 요소는 아니지만, 객체 생성 절차를 캡슐화하고 재사용 가능하게 만들어줍니다.
 
 ```python
-python
-코드 복사
 class Director:
     def __init__(self, builder):
         self._builder = builder
@@ -92,8 +86,6 @@ class Director:
 클라이언트 코드에서 빌더를 사용하여 컴퓨터 객체를 생성합니다.
 
 ```python
-python
-코드 복사
 # 빌더 인스턴스 생성
 builder = ComputerBuilder()
 
@@ -111,8 +103,6 @@ print(office_computer)
 ### 실행 결과
 
 ```yaml
-yaml
-코드 복사
 Computer specs:
 CPU: Intel Core i9
 RAM: 32GB DDR4
@@ -172,8 +162,6 @@ ChatGPT
 먼저, 복제 기능을 제공하는 프로토타입 인터페이스를 정의합니다.
 
 ```python
-python
-코드 복사
 from abc import ABC, abstractmethod
 import copy
 
@@ -194,8 +182,6 @@ class Shape(ABC):
 이제 `Shape`를 상속하여 원(`Circle`)과 사각형(`Rectangle`)을 구현하고, 각 클래스에서 `clone()` 메서드를 정의합니다.
 
 ```python
-python
-코드 복사
 class Circle(Shape):
     def __init__(self, radius):
         self.radius = radius
@@ -226,8 +212,6 @@ class Rectangle(Shape):
 클라이언트 코드에서는 원본 객체를 생성한 후, `clone()` 메서드를 사용하여 객체를 복제합니다.
 
 ```python
-python
-코드 복사
 if __name__ == "__main__":
     # 원본 객체 생성
     original_circle = Circle(5)
