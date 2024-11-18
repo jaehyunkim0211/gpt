@@ -348,3 +348,74 @@ if __name__ == "__main__":
 - **프로토타입 패턴**은 객체를 복제하여 생성하는 방식으로, 객체 생성의 비용과 시간을 줄이고자 할 때 유용합니다.
 
 이러한 패턴들은 상황에 따라 적절하게 사용되어야 하며, 문제의 복잡도와 요구사항에 따라 어떤 패턴이 적합한지 판단하는 것이 중요합니다.
+
+
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.preprocessing import StandardScaler
+
+# 샘플 시계열 데이터 생성
+def generate_sample_data(length=1000, noise=0.2):
+    t = np.linspace(0, 4 * np.pi, length)
+    data = np.sin(t) + noise * np.random.randn(length)
+    return data
+
+# 시계열 데이터를 정규화하는 함수
+def normalize_data(data):
+    scaler = StandardScaler()
+    normalized = scaler.fit_transform(data.reshape(-1, 1)).flatten()
+    return normalized
+
+# 슬라이딩 윈도우로 데이터 분할
+def sliding_window(data, window_size, step_size):
+    windows = []
+    for start in range(0, len(data) - window_size + 1, step_size):
+        end = start + window_size
+        windows.append(data[start:end])
+    return np.array(windows)
+
+# 시계열 데이터를 이미지로 변환
+def time_series_to_image(data, window_size, step_size, save_dir='images', show_lines=True):
+    windows = sliding_window(data, window_size, step_size)
+
+    # 이미지 생성 및 저장
+    for idx, window in enumerate(windows):
+        plt.figure(figsize=(6, 4))
+        plt.plot(window, label="Time Series", color='blue')
+        plt.title(f"Window {idx}")
+        plt.xlabel("Time")
+        plt.ylabel("Value")
+
+        # 보조선 추가
+        if show_lines:
+            for i in range(0, len(window), max(1, len(window) // 5)):
+                plt.axvline(x=i, color='gray', linestyle='--', linewidth=0.5)
+            plt.axhline(y=0, color='gray', linestyle='--', linewidth=0.5)
+
+        # 그래프 저장
+        plt.legend()
+        plt.tight_layout()
+        plt.savefig(f"{save_dir}/window_{idx}.png")
+        plt.close()
+
+# 메인 실행
+if __name__ == "__main__":
+    import os
+
+    # 샘플 데이터 생성
+    data = generate_sample_data()
+    normalized_data = normalize_data(data)
+
+    # 파라미터 설정
+    window_size = 100
+    step_size = 50
+    save_dir = 'images'
+
+    # 디렉토리 생성
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+
+    # 시계열 데이터를 이미지로 변환
+    time_series_to_image(normalized_data, window_size, step_size, save_dir, show_lines=True)
+
+    print(f"Images saved to {save_dir}")
