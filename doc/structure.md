@@ -1,0 +1,113 @@
+# 프로젝트 구조 & 파일 역할
+
+시계열 예측(Jena Climate 기온 24h-ahead)과 분류(UCI HAR 활동 인식)를
+전통 ML 베이스라인(Naive/SARIMA/XGBoost/RandomForest)과 딥러닝(LSTM/1D-CNN)으로
+비교하는 분석 파이프라인입니다.
+
+데이터 흐름 요약:
+```
+data_loader  →  preprocessing + features  →  models_*  →  train  →  evaluate  →  visualize
+```
+
+---
+
+## 디렉터리 트리
+
+```
+toy/
+├── README.md                 # 환경 설치·실행 방법
+├── requirements.txt          # 핵심 의존성(PyTorch 제외)
+├── requirements.lock.txt     # pip freeze 결과(정확한 버전 잠금)
+├── .gitignore                # .venv, data/raw, reports/figures PNG 제외
+├── doc/                      # 코드 구조·설계 문서 (이 폴더)
+│   └── structure.md          # ← 이 파일
+├── data/
+│   ├── raw/                  # (gitignore) 다운로드 원본 캐시
+│   └── processed/            # (gitignore) 가공 산출물
+├── notebooks/
+│   ├── 00_eda.ipynb          # 두 데이터셋 EDA + 무작위 샘플 뷰어
+│   ├── 01_forecast_jena_climate.ipynb  # Naive/SARIMA/XGBoost/LSTM 비교
+│   └── 02_classify_uci_har.ipynb       # RandomForest/XGBoost/1D-CNN 비교
+├── src/                      # 재사용 가능한 파이썬 모듈
+│   ├── __init__.py
+│   ├── data_loader.py
+│   ├── preprocessing.py
+│   ├── features.py
+│   ├── models_baseline.py
+│   ├── models_dl.py
+│   ├── train.py
+│   ├── evaluate.py
+│   └── visualize.py
+└── reports/
+    └── figures/              # (gitignore PNG) 노트북이 저장하는 결과 그림
+```
+
+---
+
+## 파일별 역할
+
+### 최상위
+
+| 파일 | 역할 |
+|---|---|
+| `README.md` | 환경 설치(venv, PyTorch GPU, 커널 등록), 데이터 다운로드, 노트북 실행 순서, 트러블슈팅. 처음 저장소를 받은 사람이 이것만 읽고 환경을 세팅할 수 있게 유지. |
+| `requirements.txt` | 일반 의존성 핀. **PyTorch는 별도 채널(`--index-url`)로 먼저 설치해야 GPU 빌드가 잡힘** — 여기 포함 안 됨. |
+| `requirements.lock.txt` | 모든 간접 의존성까지 포함한 재현용 스냅샷. 문제가 생기면 이 파일로 복구. |
+| `.gitignore` | 로컬 venv, 데이터 원본, 생성된 그림, Jupyter 체크포인트 등 커밋 금지 항목. |
+
+### `doc/`
+설계·구조 설명 문서. 코드 자체로는 알기 어려운 "왜 이렇게 구성했는가"를 남기는 곳.
+새 모듈이 추가되거나 구조가 바뀌면 `structure.md`를 같이 업데이트.
+
+### `data/`
+- `raw/` — 외부에서 받은 원본(Jena CSV ZIP, UCI HAR ZIP). `data_loader`가 처음 호출될 때 자동 다운로드·압축 해제.
+- `processed/` — 현재는 비어 있음. 추후 피처 엔지니어링 결과를 캐시하고 싶을 때 사용.
+
+### `notebooks/`
+- `00_eda.ipynb` — **모델링 전 데이터 감 잡는 용도**. Jena 기온 시계열, 결측/기간/분포, 무작위 1주 구간 다변수 plot. HAR 쪽은 활동별 신호 비교, 무작위 윈도우 뷰어. `seed=None`으로 호출하면 셀 재실행마다 다른 샘플이 나옴.
+- `01_forecast_jena_climate.ipynb` — 24시간 기온 예측 파이프라인. Naive → SARIMA(마지막 30일로 빠르게) → XGBoost(lag feature) → LSTM(PyTorch GPU) 순서로 비교, MAE/RMSE/MAPE 테이블과 예측 vs 실제 plot 산출.
+- `02_classify_uci_har.ipynb` — 6가지 활동 분류. RandomForest/XGBoost(561 handcrafted features) vs 1D-CNN(9ch × 128 timestep raw). Accuracy/macro-F1 + confusion matrix.
+
+### `src/` — 재사용 모듈
+
+| 파일 | 한 줄 요약 | 주요 심볼 |
+|---|---|---|
+| `__init__.py` | 패키지 마커(빈 파일). | — |
+| `data_loader.py` | 두 데이터셋의 다운로드·캐시·로딩을 담당. 최초 1회만 네트워크 접근. | `fetch_jena_climate`, `fetch_uci_har`, `load_jena_climate`, `load_uci_har`, `HAR_LABELS`, `HAR_CHANNELS`, `fetch_all` |
+| `preprocessing.py` | 시계열 전처리 유틸. 10분→1시간 다운샘플링(결측 보간 포함), 시간순 분할, 스케일러, 슬라이딩 윈도우 생성. | `downsample_hourly`, `time_split`, `StandardScaler1D`, `make_supervised_windows` |
+| `features.py` | 트리 모델용 피처 엔지니어링. 시각의 sin/cos 인코딩, lag feature, dropna 포함한 supervised 테이블 조립. | `add_time_features`, `add_lag_features`, `make_supervised_table` |
+| `models_baseline.py` | 비-딥러닝 모델 팩토리. 얇은 래퍼만 제공하고 실제 계산은 scikit-learn/XGBoost가 수행. | `naive_forecast`, `fit_xgb_regressor`, `fit_xgb_classifier`, `fit_random_forest` |
+| `models_dl.py` | PyTorch 모델 클래스. 예측용 LSTM, 분류용 1D-CNN. `forward` 규약을 맞춰 `train.train_model`이 그대로 재사용 가능. | `LSTMForecaster`, `CNN1DClassifier` |
+| `train.py` | 공통 학습 루프. GPU 자동 선택, DataLoader 생성, AdamW + tqdm, history 기록, inference 헬퍼. | `get_device`, `TrainHistory`, `make_loader`, `train_model`, `predict` |
+| `evaluate.py` | 회귀(MAE/RMSE/MAPE)와 분류(accuracy/macro-F1/report/confusion matrix) 지표 계산. 노트북은 이 함수들만 호출. | `mae`, `rmse`, `mape`, `regression_report`, `classification_summary` |
+| `visualize.py` | 모든 plot 생성·저장. 노트북이 figure를 직접 그리지 않고 여기를 통해 일관된 스타일 유지. | `plot_random_climate_window`, `plot_random_har_samples`, `plot_har_class_distribution`, `plot_forecast_vs_actual`, `plot_metric_bars`, `plot_confusion_matrix`, `plot_training_curves` 등 |
+
+### `reports/figures/`
+노트북이 저장하는 PNG 결과. `.gitignore`로 PNG 자체는 커밋되지 않지만, `.gitkeep`으로 폴더 자체는 유지되어 경로가 항상 존재.
+
+---
+
+## 모듈 간 의존 관계
+
+```
+notebook
+  ├─ data_loader (독립, 외부 네트워크만 의존)
+  ├─ preprocessing ──┐
+  ├─ features       │  (둘 다 pandas/numpy만 의존, 서로 독립)
+  ├─ models_baseline ──┐
+  ├─ models_dl ─────────┤
+  │                     ├─ evaluate (numpy/sklearn 지표)
+  │                     └─ visualize (matplotlib/seaborn)
+  └─ train (torch 전용, models_dl에서 받은 nn.Module을 학습)
+```
+
+순환 의존은 없습니다. `train`은 모델 클래스를 인자로 받으므로 `models_dl`을 import하지 않습니다.
+
+---
+
+## 기여 규칙
+
+- 새 `.py` 파일을 만들 때 **파일 상단에 module docstring**(이 파일이 무엇을 하는지 + 주요 심볼 리스트)을 반드시 쓴다.
+- 모든 `public` 함수/클래스에 docstring(역할·인자·반환·부작용)을 쓴다.
+- 구조/파일이 추가되면 **이 `structure.md`도 같은 커밋에서 갱신**한다.
+- 노트북에 복잡한 로직을 쓰지 말고 `src/`로 뽑아내 테스트·재사용 가능하게 유지한다.
