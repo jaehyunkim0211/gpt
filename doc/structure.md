@@ -23,11 +23,14 @@ toy/
 │   └── structure.md          # ← 이 파일
 ├── data/
 │   ├── raw/                  # (gitignore) 다운로드 원본 캐시
+│   │   └── jpx/              # (symlink) Kaggle JPX 대회 데이터 → ~/code/jpx/
 │   └── processed/            # (gitignore) 가공 산출물
 ├── notebooks/
 │   ├── 00_eda.ipynb          # 두 데이터셋 EDA + 무작위 샘플 뷰어
 │   ├── 01_forecast_jena_climate.ipynb  # Naive/SARIMA/XGBoost/LSTM 비교
-│   └── 02_classify_uci_har.ipynb       # RandomForest/XGBoost/1D-CNN 비교
+│   ├── 02_classify_uci_har.ipynb       # RandomForest/XGBoost/1D-CNN 비교
+│   ├── 03_jpx_competition_intro.ipynb  # JPX 대회 소개 + 공식 메트릭 재현
+│   └── 04_jpx_change_point.ipynb       # JPX 종가 시계열 변화점 탐지
 ├── src/                      # 재사용 가능한 파이썬 모듈
 │   ├── __init__.py
 │   ├── data_loader.py
@@ -37,7 +40,10 @@ toy/
 │   ├── models_dl.py
 │   ├── train.py
 │   ├── evaluate.py
-│   └── visualize.py
+│   ├── visualize.py
+│   ├── jpx_loader.py         # JPX 대회 데이터 로더 (stock_prices, trades, 등)
+│   ├── jpx_metric.py         # JPX 공식 채점 함수(일별 스프레드·Sharpe)
+│   └── change_point.py       # 시계열 변화점 탐지 (ruptures + 커스텀 강건 버전)
 └── reports/
     └── figures/              # (gitignore PNG) 노트북이 저장하는 결과 그림
 ```
@@ -67,6 +73,8 @@ toy/
 - `00_eda.ipynb` — **모델링 전 데이터 감 잡는 용도**. Jena 기온 시계열, 결측/기간/분포, 무작위 1주 구간 다변수 plot. HAR 쪽은 활동별 신호 비교, 무작위 윈도우 뷰어. `seed=None`으로 호출하면 셀 재실행마다 다른 샘플이 나옴.
 - `01_forecast_jena_climate.ipynb` — 24시간 기온 예측 파이프라인. Naive → SARIMA(마지막 30일로 빠르게) → XGBoost(lag feature) → LSTM(PyTorch GPU) 순서로 비교, MAE/RMSE/MAPE 테이블과 예측 vs 실제 plot 산출.
 - `02_classify_uci_har.ipynb` — 6가지 활동 분류. RandomForest/XGBoost(561 handcrafted features) vs 1D-CNN(9ch × 128 timestep raw). Accuracy/macro-F1 + confusion matrix.
+- `03_jpx_competition_intro.ipynb` — JPX Tokyo Market Prediction 대회 데이터 구조와 공식 메트릭(Sup/Sdown → Sharpe) 재현. `src.jpx_loader` + `src.jpx_metric` 헬퍼만 호출하는 얇은 노트북.
+- `04_jpx_change_point.ipynb` — JPX 종가 시계열에 단순 PELT와 커스텀 강건 탐지기를 모두 적용해 레짐 전환 시점을 비교. `src.change_point`만 호출.
 
 ### `src/` — 재사용 모듈
 
@@ -81,6 +89,9 @@ toy/
 | `train.py` | 공통 학습 루프. GPU 자동 선택, DataLoader 생성, AdamW + tqdm, history 기록, inference 헬퍼. | `get_device`, `TrainHistory`, `make_loader`, `train_model`, `predict` |
 | `evaluate.py` | 회귀(MAE/RMSE/MAPE)와 분류(accuracy/macro-F1/report/confusion matrix) 지표 계산. 노트북은 이 함수들만 호출. | `mae`, `rmse`, `mape`, `regression_report`, `classification_summary` |
 | `visualize.py` | 모든 plot 생성·저장. 노트북이 figure를 직접 그리지 않고 여기를 통해 일관된 스타일 유지. | `plot_random_climate_window`, `plot_random_har_samples`, `plot_har_class_distribution`, `plot_forecast_vs_actual`, `plot_metric_bars`, `plot_confusion_matrix`, `plot_training_curves` 등 |
+| `jpx_loader.py` | Kaggle JPX 대회 CSV 로더 + 종목별 시리즈 / Rank 컬럼 유틸. `data/raw/jpx/` symlink를 읽는다. | `load_stock_prices`, `load_secondary_stock_prices`, `load_financials`, `load_trades`, `load_options`, `load_stock_list`, `load_spec`, `load_sample_submission`, `get_stock_series`, `add_rank_column` |
+| `jpx_metric.py` | JPX 공식 채점: Target 정의 재현, 일별 스프레드 수익(Sup-Sdown), 기간 전체 Sharpe. | `compute_target_from_close`, `daily_spread_return`, `calc_spread_return_sharpe` |
+| `change_point.py` | 시계열 변화점 탐지. 단순 버전(`ruptures.Pelt`)과 커스텀 강건 버전(level+volatility+trend 합성, MAD robust scaling)을 한 파일에서 제공. | `get_stock_series`, `smooth_series`, `pelt_change_points`, `plot_with_change_points`, `analyze_stock_pelt`, `detect_change_points` |
 
 ### `reports/figures/`
 노트북이 저장하는 PNG 결과. `.gitignore`로 PNG 자체는 커밋되지 않지만, `.gitkeep`으로 폴더 자체는 유지되어 경로가 항상 존재.
