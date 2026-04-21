@@ -1,0 +1,11 @@
+.venv/
+.claude/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+data/raw/
+data/processed/
+reports/figures/*.png
+!reports/figures/.gitkeep
+.env
+.DS_Store
