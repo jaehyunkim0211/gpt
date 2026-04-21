@@ -9,8 +9,15 @@ import pandas as pd
 
 
 def downsample_hourly(df: pd.DataFrame) -> pd.DataFrame:
-    """Resample 10-minute Jena data to hourly mean."""
-    return df.resample("1h").mean()
+    """Resample 10-minute Jena data to hourly mean.
+
+    The raw series has a few gaps (largest ~3 days). After resampling these
+    become NaN rows, which break Naive/SARIMA/LSTM downstream. We fill them
+    by time-based linear interpolation so the index stays contiguous.
+    """
+    hourly = df.resample("1h").mean()
+    hourly = hourly.interpolate(method="time", limit_direction="both")
+    return hourly
 
 
 def time_split(df: pd.DataFrame, ratios: tuple[float, float, float] = (0.7, 0.15, 0.15)):
